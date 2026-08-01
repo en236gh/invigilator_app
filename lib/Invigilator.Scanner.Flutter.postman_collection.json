@@ -1,0 +1,403 @@
+{
+  "info": {
+    "_postman_id": "flutter-invigilator-scanner-api",
+    "name": "Invigilator Scanner (Flutter) API",
+    "description": "All endpoints needed by the Flutter invigilator scanner app for:\n1. Staff login\n2. Loading assigned exams/venues and starting a session\n3. Student verification by **computer number**\n4. Student verification by scanning an **examination-pass QR code**\n5. Attendance register / summary helpers\n\n**Recommended Flutter flow**\n1. Login → store `accessToken`\n2. List assignments → pick `examSessionId` + `venueId`\n3. Start session (required before check-in)\n4. Either:\n   - Type/scan computer number → Lookup → Check-in\n   - Scan exam-pass QR → Lookup by QR → Check-in by QR\n\n**Seed invigilator**\n- Email: `invigilator@unza.zm`\n- Password: `Invig@2026`\n- Default examSessionId: `5` (CS101)\n- Default venueId: `16` (Main LT 1)\n- Demo students: `2022004264`, `2022004265`, `2022004266`\n\n**Getting a QR token for testing**\n1. Use `Student.ExaminationPass` collection → Login as student `2022004265` / `Password1`\n2. Generate Examination Pass\n3. Copy `data.qrToken` into environment variable `qrToken` here\n\nAll authenticated requests use Bearer `{{accessToken}}`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "1. Auth",
+      "item": [
+        {
+          "name": "Login as Invigilator",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login succeeded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.accessToken).to.be.a('string');",
+                  "  pm.environment.set('accessToken', body.data.accessToken);",
+                  "  if (body.data.refreshToken) {",
+                  "    pm.environment.set('refreshToken', body.data.refreshToken);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/login",
+            "description": "Staff login for the invigilator scanner app.\n\n**Request**\n```json\n{ \"email\": \"invigilator@unza.zm\", \"password\": \"Invig@2026\" }\n```\n\n**Response `data`**\n- `accessToken` — send as `Authorization: Bearer <token>`\n- `refreshToken` — optional refresh via `POST /api/auth/refresh`"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refresh succeeded or skipped', function () {",
+                  "  if (!pm.environment.get('refreshToken')) {",
+                  "    pm.expect.fail('Set refreshToken from Login first');",
+                  "  }",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.environment.set('accessToken', body.data.accessToken);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/refresh",
+            "description": "Exchanges a refresh token for a new access token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Session Setup",
+      "item": [
+        {
+          "name": "List My Assignments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Assignments returned', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "  if (body.data.length > 0) {",
+                  "    const preferred = body.data.find(a => a.venueId === 16 || a.venueName === 'Main LT 1') || body.data[0];",
+                  "    pm.environment.set('examSessionId', String(preferred.examSessionId));",
+                  "    pm.environment.set('venueId', String(preferred.venueId));",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/invigilator/assignments",
+            "description": "Returns exams/venues assigned to the logged-in invigilator.\n\nUse these IDs in the scanner UI selectors — do not hard-code them in production.\n\nEach item includes: `examSessionId`, `courseCode`, `examDate`, `startTime`, `endTime`, `examStatus`, `venueId`, `venueName`, `building`, `capacity`, `lecturers[]`."
+          }
+        },
+        {
+          "name": "Start Examination Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Session started or already in progress', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data.examStatus).to.eql('IN_PROGRESS');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/invigilator/assignments/{{examSessionId}}/{{venueId}}/start",
+            "description": "Marks the exam session `IN_PROGRESS`.\n\n**Required before check-in.** Check-in fails with 409 if the session is still `SCHEDULED`."
+          }
+        },
+        {
+          "name": "End Examination Session",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/api/invigilator/assignments/{{examSessionId}}/{{venueId}}/end",
+            "description": "Marks the exam `COMPLETED` and records ABSENT for allocated students with no attendance.\n\nUse sparingly while testing check-in — ending the session blocks further check-ins."
+          }
+        },
+        {
+          "name": "Invigilator Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/dashboard/invigilator",
+            "description": "Optional summary counts for the scanner home screen:\n`assignedExaminations`, `assignedVenues`, `checkedInStudents`, `absentStudents`, `scriptsCollected`, `incidents`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Computer Number Verification",
+      "item": [
+        {
+          "name": "Lookup Student by Computer Number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Student lookup succeeded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.include.keys(",
+                  "    'computerNumber', 'fullName', 'program', 'photoPath',",
+                  "    'allocatedVenueId', 'allocatedVenueName', 'seatNumber', 'alreadyCheckedIn'",
+                  "  );",
+                  "  if (body.data.allocatedVenueId) {",
+                  "    pm.environment.set('venueId', String(body.data.allocatedVenueId));",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/attendance/lookup?computerNumber={{computerNumber}}&examSessionId={{examSessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "attendance", "lookup"],
+              "query": [
+                {
+                  "key": "computerNumber",
+                  "value": "{{computerNumber}}"
+                },
+                {
+                  "key": "examSessionId",
+                  "value": "{{examSessionId}}"
+                }
+              ]
+            },
+            "description": "Preview student identity before check-in (manual / barcode computer-number entry).\n\n**Query params**\n- `computerNumber` — exactly 10 digits, first 4 = year (e.g. `2022004264`)\n- `examSessionId`\n\n**Response `data`**\n- identity: `computerNumber`, `fullName`, `program`, `photoPath`\n- allocation: `allocatedVenueId`, `allocatedVenueName`, `seatNumber`\n- `alreadyCheckedIn`\n\nFlutter UX: show confirmation card, then call Check In."
+          }
+        },
+        {
+          "name": "Check In by Computer Number",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Check-in accepted or duplicate blocked', function () {",
+                  "  const code = pm.response.code;",
+                  "  pm.expect([200, 409]).to.include(code);",
+                  "  const body = pm.response.json();",
+                  "  if (code === 200) {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.data.attendanceStatus).to.be.oneOf(['PRESENT', 'WRONG_VENUE']);",
+                  "    pm.expect(body.data.verificationMethod).to.eql('COMPUTER');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"computerNumber\": \"{{computerNumber}}\",\n  \"examSessionId\": {{examSessionId}},\n  \"venueId\": {{venueId}},\n  \"verificationMethod\": \"COMPUTER\"\n}"
+            },
+            "url": "{{baseUrl}}/api/attendance/check-in",
+            "description": "Records attendance using a typed/scanned computer number.\n\n**Body**\n```json\n{\n  \"computerNumber\": \"2022004264\",\n  \"examSessionId\": 5,\n  \"venueId\": 16,\n  \"verificationMethod\": \"COMPUTER\"\n}\n```\n\n**Notes**\n- Use the student's **allocated** `venueId` for `PRESENT`\n- Wrong assigned venue → `WRONG_VENUE`\n- Duplicate → 409\n- Session must be `IN_PROGRESS`\n\nAllowed `verificationMethod` values when using this endpoint: `COMPUTER`, `QR_CODE`, `FACE_RECOGNITION`, `QR_AND_FACE`, `QR_AND_FACIAL`.\nFor real QR validation use **Check In by QR** instead — that endpoint verifies the signed token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. QR Code Verification",
+      "item": [
+        {
+          "name": "Lookup Student by QR",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('QR lookup succeeded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.success).to.eql(true);",
+                  "  pm.expect(body.data).to.include.keys(",
+                  "    'computerNumber', 'fullName', 'program', 'photoPath',",
+                  "    'allocatedVenueId', 'allocatedVenueName', 'seatNumber', 'alreadyCheckedIn'",
+                  "  );",
+                  "  pm.environment.set('computerNumberFromQr', body.data.computerNumber);",
+                  "  if (body.data.allocatedVenueId) {",
+                  "    pm.environment.set('venueId', String(body.data.allocatedVenueId));",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrToken\": \"{{qrToken}}\",\n  \"examSessionId\": {{examSessionId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/attendance/lookup-by-qr",
+            "description": "Validates a scanned examination-pass QR JWT and returns the same student preview as computer-number lookup.\n\n**Body**\n```json\n{\n  \"qrToken\": \"<raw JWT string from QR payload>\",\n  \"examSessionId\": 5\n}\n```\n\n**What the backend checks**\n1. JWT signature + `purpose=EXAM_PASS` + not expired\n2. Token matches the currently stored examination pass (`qr_jti` / token) — regenerated passes invalidate old printouts\n3. Pass academic year/semester matches the selected exam session\n4. Student is allocated to that exam and invigilator is assigned\n\n**Flutter**\n- Camera scan → read QR string into `qrToken`\n- Call this endpoint first to show identity card\n- Then call Check In by QR"
+          }
+        },
+        {
+          "name": "Check In by QR",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('QR check-in accepted or duplicate blocked', function () {",
+                  "  const code = pm.response.code;",
+                  "  pm.expect([200, 409]).to.include(code);",
+                  "  const body = pm.response.json();",
+                  "  if (code === 200) {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.data.attendanceStatus).to.be.oneOf(['PRESENT', 'WRONG_VENUE']);",
+                  "    pm.expect(body.data.verificationMethod).to.eql('QR_CODE');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrToken\": \"{{qrToken}}\",\n  \"examSessionId\": {{examSessionId}},\n  \"venueId\": {{venueId}}\n}"
+            },
+            "url": "{{baseUrl}}/api/attendance/check-in-by-qr",
+            "description": "Validates the scanned examination-pass QR and records attendance with `verificationMethod = QR_CODE`.\n\n**Body**\n```json\n{\n  \"qrToken\": \"<raw JWT string from QR payload>\",\n  \"examSessionId\": 5,\n  \"venueId\": 16\n}\n```\n\nNo `computerNumber` is required — identity is resolved from the signed QR.\n\nSame venue/session rules as computer-number check-in:\n- allocated venue → `PRESENT`\n- different assigned venue → `WRONG_VENUE`\n- duplicate → 409\n- invalid/expired/revoked QR → 400"
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Attendance Helpers",
+      "item": [
+        {
+          "name": "List Attendance for Exam",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/attendance/exam/{{examSessionId}}",
+            "description": "Full attendance register for an exam session.\n\nUseful for a live list / refresh after each successful scan."
+          }
+        },
+        {
+          "name": "Attendance Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/attendance/exam/{{examSessionId}}/summary",
+            "description": "Counts: present, absent, scriptsCollected."
+          }
+        },
+        {
+          "name": "Mark Scripts Collected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"count\": 1\n}"
+            },
+            "url": "{{baseUrl}}/api/attendance/exam/{{examSessionId}}/scripts-collected",
+            "description": "Updates scripts-collected flag for attendance rows on this exam."
+          }
+        }
+      ]
+    }
+  ]
+}

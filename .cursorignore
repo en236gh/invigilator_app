@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+.venv/
+vendor/
+
+# Build outputs & caches
+dist/
+build/
+out/
+.next/
+.dart_tool/
+.gradle/
+
+# Databases & large data files
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+*.json
+*.log
+
+# Media / Static Assets (if you have huge asset folders)
+assets/images/
+public/uploads/

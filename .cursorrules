@@ -1,0 +1,51 @@
+- Framework: Flutter with Clean Architecture (Presentation, Application, Domain, Data)
+- State Management: Riverpod
+- Local DB: Drift (SQLite)
+- Networking: Dio with Interceptors for JWT Refresh Tokens
+- Rules: Always use const constructors. Keep build() methods lightweight. Extract UI components.
+You are working on the UNZA Examination Attendance Flutter Application.
+
+Project standards:
+
+Architecture:
+- Flutter Clean Architecture
+- Feature-first folder structure
+- Separation of presentation, domain, data layers
+
+State Management:
+- Riverpod only
+
+Database:
+- Drift ORM
+- SQLite offline-first architecture
+
+Networking:
+- Dio
+- JWT authentication
+- Refresh token support
+- Interceptors
+
+Coding Rules:
+- Prefer const constructors
+- Keep build methods lightweight
+- Never put business logic inside widgets
+- Extract reusable widgets
+- Avoid duplicated code
+- Follow SOLID principles
+
+UI Rules:
+- Enterprise quality UI
+- Consistent spacing system
+- Responsive design
+- Loading states required
+- Error states required
+- Empty states required
+- Offline states required
+
+Performance:
+- Avoid unnecessary rebuilds
+- Use ListView.builder
+- Dispose controllers properly
+- Use isolates for heavy computation
+
+The application should feel like production software used by a university.
