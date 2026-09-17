@@ -10,7 +10,7 @@ class ApiClient {
   // 10.0.2.2 works for Android emulator; a physical phone must use the laptop's IP.
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.0.151:8080',
+    defaultValue: 'http://192.168.0.150:8080',
   );
 
   static final Dio instance = Dio(BaseOptions(
