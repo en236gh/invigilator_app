@@ -27,7 +27,8 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   final AttendanceRepository _attendanceRepo = AttendanceRepository();
-  final TextEditingController _scriptsCollectedController = TextEditingController();
+  final TextEditingController _scriptsCollectedController =
+      TextEditingController();
 
   bool _sessionActionInProgress = false;
   bool _savingScripts = false;
@@ -51,7 +52,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Future<void> _loadSummary() async {
     try {
-      final summary = await ref.read(examRepositoryProvider).getDashboardSummary();
+      final summary = await ref
+          .read(examRepositoryProvider)
+          .getDashboardSummary();
       if (!mounted) return;
       setState(() {
         _summary = summary;
@@ -86,7 +89,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       setState(() {
         _scriptsCollected = attendanceSummary.scriptsCollected;
         _scriptsExamSessionId = assignment.examSessionId;
-        _scriptsCollectedController.text = '${attendanceSummary.scriptsCollected}';
+        _scriptsCollectedController.text =
+            '${attendanceSummary.scriptsCollected}';
       });
     } catch (_) {
       if (!mounted) return;
@@ -120,7 +124,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final assignment = ref.read(selectedExamProvider);
     if (assignment == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select an exam before updating scripts.')),
+        const SnackBar(
+          content: Text('Select an exam before updating scripts.'),
+        ),
       );
       return;
     }
@@ -170,7 +176,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final assignment = ref.read(selectedExamProvider);
     if (assignment == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select an exam before starting a session.')),
+        const SnackBar(
+          content: Text('Select an exam before starting a session.'),
+        ),
       );
       return;
     }
@@ -197,14 +205,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     });
 
     try {
-      await ref.read(examRepositoryProvider).startSession(
+      await ref
+          .read(examRepositoryProvider)
+          .startSession(
             examSessionId: assignment.examSessionId,
             venueId: assignment.venueId,
           );
       await ref.read(examAssignmentsProvider.notifier).refresh();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${assignment.courseCode} at ${assignment.venueName} is now in progress.')),
+        SnackBar(
+          content: Text(
+            '${assignment.courseCode} at ${assignment.venueName} is now in progress.',
+          ),
+        ),
       );
       context.go('/verification');
     } catch (error) {
@@ -234,8 +248,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           'End ${assignment.courseCode} at ${assignment.venueName}? Allocated students without attendance will be marked ABSENT, and check-in will be blocked.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('End session')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('End session'),
+          ),
         ],
       ),
     );
@@ -247,7 +267,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     });
 
     try {
-      await ref.read(examRepositoryProvider).endSession(
+      await ref
+          .read(examRepositoryProvider)
+          .endSession(
             examSessionId: assignment.examSessionId,
             venueId: assignment.venueId,
           );
@@ -276,14 +298,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (error.response?.statusCode == 401) {
         return 'Please sign in again to refresh your session.';
       }
-      if (error.response?.statusCode == 400 || error.response?.statusCode == 409) {
+      if (error.response?.statusCode == 400 ||
+          error.response?.statusCode == 409) {
         final serverMessage = error.response?.data is Map
             ? '${(error.response!.data as Map)['message'] ?? (error.response!.data as Map)['error'] ?? ''}'
             : '';
         if (serverMessage.isNotEmpty) return serverMessage;
         return 'We could not update the exam session right now. Please try again.';
       }
-      if (error.type == DioExceptionType.connectionTimeout || error.type == DioExceptionType.receiveTimeout) {
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout) {
         return 'Connection timed out. Check your network and tap retry.';
       }
       if (error.type == DioExceptionType.badResponse) {
@@ -307,7 +331,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final assignment = ref.read(selectedExamProvider);
     if (assignment == null) return 'Select an exam first';
     if (assignment.isInProgress) return 'Resume student verification';
-    if (assignment.isScheduled) return 'Mark ${assignment.courseCode} in progress';
+    if (assignment.isScheduled)
+      return 'Mark ${assignment.courseCode} in progress';
     return 'Review verification for this venue';
   }
 
@@ -352,7 +377,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 controller: _scriptsCollectedController,
                 keyboardType: TextInputType.number,
                 enabled: enabled,
-                decoration: const InputDecoration(labelText: 'Number of collected scripts'),
+                decoration: const InputDecoration(
+                  labelText: 'Number of collected scripts',
+                ),
               ),
               const SizedBox(height: AppSpacing.lg),
               AppButton(
@@ -398,14 +425,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         ),
       AppActionTile(
         title: 'Attendance register',
-        subtitle: selected == null ? 'Select an exam first' : 'Open the attendance list',
+        subtitle: selected == null
+            ? 'Select an exam first'
+            : 'Open the attendance list',
         icon: Icons.list_alt_outlined,
         enabled: selected != null,
         onTap: () => context.go('/attendance'),
       ),
       AppActionTile(
         title: 'Report incident',
-        subtitle: selected == null ? 'Select an exam first' : 'Record an issue quickly',
+        subtitle: selected == null
+            ? 'Select an exam first'
+            : 'Record an issue quickly',
         icon: Icons.report_outlined,
         enabled: selected != null,
         onTap: () => context.go('/incidents'),
@@ -417,12 +448,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: tiles.length,
-        separatorBuilder: (context, index) => const SizedBox(width: AppSpacing.grid),
+        separatorBuilder: (context, index) =>
+            const SizedBox(width: AppSpacing.grid),
         itemBuilder: (context, index) {
-          return SizedBox(
-            width: 240,
-            child: tiles[index],
-          );
+          return SizedBox(width: 240, child: tiles[index]);
         },
       ),
     );
@@ -450,7 +479,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           children: [
             AppPageHeader(
               title: 'Dashboard',
-              subtitle: 'Select your assigned exam, then manage scripts and the session.',
+              subtitle:
+                  'Select your assigned exam, then manage scripts and the session.',
               trailing: IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: _refreshDashboard,
@@ -468,7 +498,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     Text(
                       _friendlyError(error),
                       textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 15, color: AppColors.brandRed),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppColors.brandRed,
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     SizedBox(
@@ -487,7 +520,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (_error != null) ...[
-                      AppErrorBanner(message: _error!, onRetry: _refreshDashboard),
+                      AppErrorBanner(
+                        message: _error!,
+                        onRetry: _refreshDashboard,
+                      ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
                     const AppSectionHeader(
@@ -499,7 +535,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       assignments: assignments,
                       selected: selected,
                       onSelect: (assignment) {
-                        ref.read(selectedExamProvider.notifier).select(assignment);
+                        ref
+                            .read(selectedExamProvider.notifier)
+                            .select(assignment);
                       },
                     ),
                     const SizedBox(height: AppSpacing.section),
@@ -507,7 +545,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     const SizedBox(height: AppSpacing.section),
                     const AppSectionHeader(
                       title: 'Quick actions',
-                      subtitle: 'Start the exam before verifying students. Ending a session closes check-in.',
+                      subtitle:
+                          'Start the exam before verifying students. Ending a session closes check-in.',
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     _buildQuickActions(selected),
@@ -537,10 +576,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             selected == null
                                 ? 'Select an assigned exam to unlock scripts and the rest of the workflow.'
                                 : selected.isScheduled
-                                    ? 'Start the session, then open verification to check students in.'
-                                    : selected.isInProgress
-                                        ? 'Continue verification, or open the attendance register to review check-ins.'
-                                        : 'Open the attendance register for the latest student list and check-in status.',
+                                ? 'Start the session, then open verification to check students in.'
+                                : selected.isInProgress
+                                ? 'Continue verification, or open the attendance register to review check-ins.'
+                                : 'Open the attendance register for the latest student list and check-in status.',
                             style: AppTypography.description,
                           ),
                         ],
@@ -549,8 +588,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ],
                 );
               },
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
