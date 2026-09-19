@@ -32,7 +32,8 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
   bool _savingIncident = false;
   String? _error;
   List<IncidentRecord> _incidents = [];
-  final TextEditingController _computerNumberController = TextEditingController();
+  final TextEditingController _computerNumberController =
+      TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _evidencePathController = TextEditingController();
   String _incidentType = 'PHONE_FOUND';
@@ -108,7 +109,8 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
     final selected = ref.read(selectedExamProvider);
     if (selected == null) {
       setState(() {
-        _error = 'Select an exam on the dashboard before reporting an incident.';
+        _error =
+            'Select an exam on the dashboard before reporting an incident.';
       });
       return;
     }
@@ -128,10 +130,14 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
       await _incidentRepository.reportIncident(
         examSessionId: selected.examSessionId,
         venueId: selected.venueId,
-        computerNumber: _computerNumberController.text.trim().isNotEmpty ? _computerNumberController.text.trim() : null,
+        computerNumber: _computerNumberController.text.trim().isNotEmpty
+            ? _computerNumberController.text.trim()
+            : null,
         incidentType: _incidentType,
         description: _descriptionController.text.trim(),
-        evidencePath: _evidencePathController.text.trim().isNotEmpty ? _evidencePathController.text.trim() : null,
+        evidencePath: _evidencePathController.text.trim().isNotEmpty
+            ? _evidencePathController.text.trim()
+            : null,
       );
       if (!mounted) return;
       _computerNumberController.clear();
@@ -139,7 +145,9 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
       _evidencePathController.clear();
       await _refreshIncidents(selected);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Incident reported successfully.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Incident reported successfully.')),
+      );
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -163,7 +171,8 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
       if (error.response?.statusCode == 401) {
         return 'Your session expired. Please sign in again.';
       }
-      if (error.type == DioExceptionType.connectionTimeout || error.type == DioExceptionType.receiveTimeout) {
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout) {
         return 'Unable to reach the server. Check your connection and try again.';
       }
       if (error.type == DioExceptionType.badResponse) {
@@ -181,7 +190,11 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
         children: [
           const Text(
             'Report a new incident',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.ink),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ink,
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
           Row(
@@ -190,18 +203,25 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
                 child: _buildDropdownField(
                   'Type',
                   _incidentType,
-                  ['CHEATING', 'PHONE_FOUND', 'WRONG_VENUE', 'MEDICAL_EMERGENCY', 'DISTURBANCE', 'LATE_ARRIVAL', 'OTHER'],
+                  [
+                    'CHEATING',
+                    'PHONE_FOUND',
+                    'WRONG_VENUE',
+                    'MEDICAL_EMERGENCY',
+                    'DISTURBANCE',
+                    'LATE_ARRIVAL',
+                    'OTHER',
+                  ],
                   (value) => setState(() => _incidentType = value),
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
-                child: _buildDropdownField(
-                  'Severity',
-                  _severity,
-                  ['MINOR', 'MAJOR', 'CRITICAL'],
-                  (value) => setState(() => _severity = value),
-                ),
+                child: _buildDropdownField('Severity', _severity, [
+                  'MINOR',
+                  'MAJOR',
+                  'CRITICAL',
+                ], (value) => setState(() => _severity = value)),
               ),
             ],
           ),
@@ -209,7 +229,9 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
           TextFormField(
             controller: _computerNumberController,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Student computer number (optional)'),
+            decoration: const InputDecoration(
+              labelText: 'Student computer number (optional)',
+            ),
           ),
           const SizedBox(height: AppSpacing.md),
           TextFormField(
@@ -220,7 +242,9 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
           const SizedBox(height: AppSpacing.md),
           TextFormField(
             controller: _evidencePathController,
-            decoration: const InputDecoration(labelText: 'Evidence path (optional)'),
+            decoration: const InputDecoration(
+              labelText: 'Evidence path (optional)',
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
           AppButton(
@@ -238,9 +262,14 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
     );
   }
 
-  Widget _buildDropdownField(String label, String currentValue, List<String> options, ValueChanged<String> onChanged) {
+  Widget _buildDropdownField(
+    String label,
+    String currentValue,
+    List<String> options,
+    ValueChanged<String> onChanged,
+  ) {
     return DropdownButtonFormField<String>(
-      value: currentValue,
+      initialValue: currentValue,
       isExpanded: true,
       decoration: InputDecoration(labelText: label),
       items: options
@@ -270,9 +299,7 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
       );
     }
 
-    return Column(
-      children: _incidents.map(_buildIncidentRow).toList(),
-    );
+    return Column(children: _incidents.map(_buildIncidentRow).toList());
   }
 
   Widget _buildIncidentRow(IncidentRecord incident) {
@@ -305,7 +332,14 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
               style: const TextStyle(fontSize: 13, color: AppColors.muted),
             ),
             const SizedBox(height: AppSpacing.md),
-            Text(incident.description, style: const TextStyle(fontSize: 14, color: AppColors.ink, height: 1.4)),
+            Text(
+              incident.description,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.ink,
+                height: 1.4,
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
             Row(
               children: [
@@ -313,13 +347,19 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
                   Expanded(
                     child: Text(
                       'Student: ${incident.computerNumber}',
-                      style: const TextStyle(fontSize: 13, color: AppColors.muted),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.muted,
+                      ),
                     ),
                   ),
                 Expanded(
                   child: Text(
                     'Reported: ${incident.createdAt}',
-                    style: const TextStyle(fontSize: 13, color: AppColors.muted),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.muted,
+                    ),
                   ),
                 ),
               ],
@@ -396,13 +436,15 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
         children: [
           const AppPageHeader(
             title: 'Incident reporting',
-            subtitle: 'Log exam incidents against the exam selected on the dashboard.',
+            subtitle:
+                'Log exam incidents against the exam selected on the dashboard.',
           ),
           const SizedBox(height: AppSpacing.xl),
           if (selected == null) ...[
             const AppEmptyState(
               title: 'No exam selected',
-              message: 'Choose an assigned exam on the dashboard before reporting or reviewing incidents.',
+              message:
+                  'Choose an assigned exam on the dashboard before reporting or reviewing incidents.',
               icon: Icons.report_outlined,
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -412,7 +454,10 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
             ),
           ] else ...[
             if (_error != null) ...[
-              AppErrorBanner(message: _error!, onRetry: () => _refreshIncidents(selected)),
+              AppErrorBanner(
+                message: _error!,
+                onRetry: () => _refreshIncidents(selected),
+              ),
               const SizedBox(height: AppSpacing.lg),
             ],
             if (_loading)
