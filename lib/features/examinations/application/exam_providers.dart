@@ -9,8 +9,8 @@ final examRepositoryProvider = Provider<ExamRepository>((ref) {
 
 final examAssignmentsProvider =
     AsyncNotifierProvider<ExamAssignmentsNotifier, List<ExamAssignment>>(
-  ExamAssignmentsNotifier.new,
-);
+      ExamAssignmentsNotifier.new,
+    );
 
 class ExamAssignmentsNotifier extends AsyncNotifier<List<ExamAssignment>> {
   @override
@@ -31,18 +31,18 @@ class ExamAssignmentsNotifier extends AsyncNotifier<List<ExamAssignment>> {
 /// Dashboard selects it; Verification, Attendance, and Incidents consume it.
 final selectedExamProvider =
     NotifierProvider<SelectedExamNotifier, ExamAssignment?>(
-  SelectedExamNotifier.new,
-);
+      SelectedExamNotifier.new,
+    );
 
 class SelectedExamNotifier extends Notifier<ExamAssignment?> {
   @override
   ExamAssignment? build() {
-    ref.listen<AsyncValue<List<ExamAssignment>>>(
-      examAssignmentsProvider,
-      (previous, next) {
-        next.whenData(_syncWithAssignments);
-      },
-    );
+    ref.listen<AsyncValue<List<ExamAssignment>>>(examAssignmentsProvider, (
+      previous,
+      next,
+    ) {
+      next.whenData(_syncWithAssignments);
+    }, fireImmediately: true);
     return null;
   }
 
@@ -60,7 +60,8 @@ class SelectedExamNotifier extends Notifier<ExamAssignment?> {
 
     for (final assignment in assignments) {
       if (!assignment.sameAs(current)) continue;
-      final changed = assignment.examStatus != current.examStatus ||
+      final changed =
+          assignment.examStatus != current.examStatus ||
           assignment.courseCode != current.courseCode ||
           assignment.venueName != current.venueName ||
           assignment.startTime != current.startTime ||

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/constants/app_colors.dart';
 import '../../app/constants/app_shadows.dart';
 import '../../app/constants/app_spacing.dart';
+import '../../features/auth/application/auth_providers.dart';
 import '../../features/auth/data/auth_repository.dart';
 
 class AppNavItem {
@@ -26,7 +28,7 @@ const List<AppNavItem> kAppNavItems = [
   AppNavItem(label: 'sync', path: '/sync', icon: Icons.sync_outlined),
 ];
 
-class AppSidebar extends StatelessWidget {
+class AppSidebar extends ConsumerWidget {
   const AppSidebar({
     super.key,
     required this.currentPath,
@@ -43,13 +45,14 @@ class AppSidebar extends StatelessWidget {
     return currentPath == path || currentPath.startsWith('$path/');
   }
 
-  Future<void> _signOut(BuildContext context) async {
+  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
     await AuthRepository().logout();
+    ref.read(currentUserProvider.notifier).clear();
     if (context.mounted) context.go('/login');
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: compact ? 88 : AppSpacing.sidebarWidth,
       decoration: BoxDecoration(
@@ -96,7 +99,7 @@ class AppSidebar extends StatelessWidget {
               Align(
                 alignment: compact ? Alignment.center : Alignment.centerLeft,
                 child: TextButton(
-                  onPressed: () => _signOut(context),
+                  onPressed: () => _signOut(context, ref),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.muted,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

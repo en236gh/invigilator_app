@@ -1,0 +1,153 @@
+{
+  "info": {
+    "_postman_id": "f2d0e3d1-8d07-4b9f-9c4b-7a9d3d8d7f21",
+    "name": "Fourth Year - Phase 7 Admin Invigilator Assignment",
+    "description": "New Phase 7 administrator APIs. Set collection variables before running. Login stores accessToken and refreshToken automatically. All assignment changes are DRAFT until the Publish request is run.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "adminEmail", "value": "admin@example.com" },
+    { "key": "adminPassword", "value": "change-me" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "examSessionId", "value": "1" },
+    { "key": "venueId", "value": "1" },
+    { "key": "staffId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Shared Authentication",
+      "description": "Use Login first. The test script stores the returned tokens in collection variables for the administrator requests.",
+      "item": [
+        {
+          "name": "Login as Administrator",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": [ "{{baseUrl}}" ], "path": [ "api", "auth", "login" ] },
+            "description": "Authenticate an administrator. The response data contains accessToken and refreshToken."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('login succeeded', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Administrator Tokens",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/refresh", "host": [ "{{baseUrl}}" ], "path": [ "api", "auth", "refresh" ] },
+            "description": "Refresh tokens when the access token expires. The used refresh token is rotated."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('refresh succeeded', function () { pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "if (json.data) {",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Actor - Administrator (New Phase 7 APIs)",
+      "description": "Administrator-only workflow: inspect staffing, generate draft assignments, review or cancel them, then publish approved drafts.",
+      "auth": { "type": "bearer", "bearer": [ { "key": "token", "value": "{{accessToken}}", "type": "string" } ] },
+      "item": [
+        {
+          "name": "List Assignments",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/admin/invigilator-assignments?examSessionId={{examSessionId}}", "host": [ "{{baseUrl}}" ], "path": [ "api", "admin", "invigilator-assignments" ], "query": [ { "key": "examSessionId", "value": "{{examSessionId}}" } ] },
+            "description": "View assignments for one exam session. Remove the query parameter to list all assignments."
+          }
+        },
+        {
+          "name": "View Venue Staffing",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/admin/invigilator-assignments/exam-sessions/{{examSessionId}}/staffing", "host": [ "{{baseUrl}}" ], "path": [ "api", "admin", "invigilator-assignments", "exam-sessions", "{{examSessionId}}", "staffing" ] },
+            "description": "Returns allocated students, required invigilators, draft/published counts, and staffingStatus for each venue."
+          }
+        },
+        {
+          "name": "Create Manual Draft Assignment",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": { "mode": "raw", "raw": "{\n  \"examSessionId\": {{examSessionId}},\n  \"venueId\": {{venueId}},\n  \"staffId\": {{staffId}},\n  \"notes\": \"Reviewed by administrator\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/api/admin/invigilator-assignments", "host": [ "{{baseUrl}}" ], "path": [ "api", "admin", "invigilator-assignments" ] },
+            "description": "Creates one DRAFT assignment. The staff member must be active, have the INVIGILATOR role, and have no time clash."
+          }
+        },
+        {
+          "name": "Generate Automatic Draft Assignments",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/admin/invigilator-assignments/exam-sessions/{{examSessionId}}/auto-assign", "host": [ "{{baseUrl}}" ], "path": [ "api", "admin", "invigilator-assignments", "exam-sessions", "{{examSessionId}}", "auto-assign" ] },
+            "description": "Calculates staffing at one invigilator per 50 allocated students, selects eligible staff, avoids clashes, balances workload, and creates DRAFT assignments only."
+          }
+        },
+        {
+          "name": "Cancel Assignment",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/admin/invigilator-assignments/{{examSessionId}}/{{venueId}}/{{staffId}}/cancel", "host": [ "{{baseUrl}}" ], "path": [ "api", "admin", "invigilator-assignments", "{{examSessionId}}", "{{venueId}}", "{{staffId}}", "cancel" ] },
+            "description": "Deletes a DRAFT assignment row. A published assignment is marked CANCELLED and no longer counts toward staffing or workload."
+          }
+        },
+        {
+          "name": "Publish Reviewed Drafts",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/admin/invigilator-assignments/exam-sessions/{{examSessionId}}/publish", "host": [ "{{baseUrl}}" ], "path": [ "api", "admin", "invigilator-assignments", "exam-sessions", "{{examSessionId}}", "publish" ] },
+            "description": "Publishes all remaining DRAFT assignments for the exam session. Run only after the administrator has reviewed the list."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Actor - Invigilator (No New Phase 7 APIs)",
+      "description": "No new invigilator frontend endpoint was added in Phase 7. Existing /api/invigilator/assignments and attendance APIs continue to work; published assignments become operational for invigilators.",
+      "item": []
+    },
+    {
+      "name": "Actor - Student (No New Phase 7 APIs)",
+      "description": "No new student frontend endpoint was added in Phase 7. Student login, profile, examination pass, and attendance-related behavior remain unchanged.",
+      "item": []
+    }
+  ]
+}

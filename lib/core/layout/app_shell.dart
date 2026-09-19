@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/constants/app_colors.dart';
 import '../../app/constants/app_spacing.dart';
+import '../../app/constants/app_typography.dart';
+import '../../features/auth/application/auth_providers.dart';
 import '../widgets/app_canvas.dart';
 import 'app_sidebar.dart';
 
@@ -93,11 +96,14 @@ class AppShell extends StatelessWidget {
   }
 }
 
-class _UserChip extends StatelessWidget {
+class _UserChip extends ConsumerWidget {
   const _UserChip();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final displayName = user?.name ?? 'Invigilator';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -120,9 +126,9 @@ class _UserChip extends StatelessWidget {
                 colors: [AppColors.brandGold, Color(0xFFF59E0B)],
               ),
             ),
-            child: const Text(
-              'IN',
-              style: TextStyle(
+            child: Text(
+              displayName.isNotEmpty ? displayName[0].toUpperCase() : 'I',
+              style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
@@ -130,22 +136,13 @@ class _UserChip extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Invigilator',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.ink,
-                ),
-              ),
-              Text(
-                'invigilator',
-                style: TextStyle(fontSize: 11, color: AppColors.muted),
-              ),
-            ],
+          Text(
+            displayName,
+            style: AppTypography.body.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ink,
+            ),
           ),
         ],
       ),
