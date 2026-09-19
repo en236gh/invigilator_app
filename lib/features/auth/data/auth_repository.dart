@@ -5,7 +5,7 @@ import '../../../core/network/api_client.dart';
 import '../domain/user.dart';
 
 class AuthRepository {
-  final Dio _dio = ApiClient.instance;
+  Dio get _dio => ApiClient.instance;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   static const String _accessTokenKey = 'accessToken';

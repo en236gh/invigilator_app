@@ -119,15 +119,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               decoration: _fieldDecoration('Password').copyWith(
                 suffixIcon: IconButton(
                   tooltip: _obscurePassword ? 'Show password' : 'Hide password',
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
                   icon: Icon(
-                    _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                    _obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
                   ),
                 ),
               ),
               style: const TextStyle(color: Colors.black),
               obscureText: _obscurePassword,
-              validator: (v) => (v == null || v.isEmpty) ? 'Enter password' : null,
+              validator: (v) =>
+                  (v == null || v.isEmpty) ? 'Enter password' : null,
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),
@@ -146,15 +150,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.black54,
                   elevation: 0,
-                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
                 ),
                 child: _loading
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Text('Sign in', style: TextStyle(fontWeight: FontWeight.w600)),
+                    : const Text(
+                        'Sign in',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
               ),
             ),
           ],
@@ -168,8 +180,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
+        // Center keeps the content vertically centred when it fits;
+        // SingleChildScrollView lets it scroll when the keyboard shrinks the body.
         child: Center(
-          child: Padding(
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -181,6 +196,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 28),
+                // No Flexible here: inside a scroll view the height is unbounded.
                 _buildFormPane(),
               ],
             ),
