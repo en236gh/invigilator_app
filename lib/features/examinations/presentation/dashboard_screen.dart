@@ -442,108 +442,116 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       _loadScriptsFor(next);
     });
 
-    return AppPageBody(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const AppPageHeader(
-            title: 'Dashboard',
-            subtitle: 'Select your assigned exam, then manage scripts and the session.',
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          assignmentsAsync.when(
-            loading: () => const AppPageSkeleton(showMetrics: false),
-            error: (error, _) => AppPanel(
-              minHeight: 280,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    _friendlyError(error),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 15, color: AppColors.brandRed),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  SizedBox(
-                    width: 160,
-                    child: AppButton(
-                      label: 'Retry',
-                      expanded: true,
-                      onPressed: _refreshDashboard,
-                    ),
-                  ),
-                ],
+    return RefreshIndicator(
+      onRefresh: _refreshDashboard,
+      child: AppPageBody(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppPageHeader(
+              title: 'Dashboard',
+              subtitle: 'Select your assigned exam, then manage scripts and the session.',
+              trailing: IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _refreshDashboard,
+                tooltip: 'Refresh',
               ),
             ),
-            data: (assignments) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_error != null) ...[
-                    AppErrorBanner(message: _error!, onRetry: _refreshDashboard),
-                    const SizedBox(height: AppSpacing.lg),
-                  ],
-                  const AppSectionHeader(
-                    title: 'Assigned exams',
-                    subtitle: 'Choose the exam you are invigilating now.',
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  ExamAssignmentCarousel(
-                    assignments: assignments,
-                    selected: selected,
-                    onSelect: (assignment) {
-                      ref.read(selectedExamProvider.notifier).select(assignment);
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.section),
-                  _buildScriptsPanel(selected),
-                  const SizedBox(height: AppSpacing.section),
-                  const AppSectionHeader(
-                    title: 'Quick actions',
-                    subtitle: 'Start the exam before verifying students. Ending a session closes check-in.',
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  _buildQuickActions(selected),
-                  const SizedBox(height: AppSpacing.section),
-                  AppPanel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Current selection',
-                          style: AppTypography.bodyStrong,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          selected == null
-                              ? '${_summary['currentSession'] ?? 'No exam selected'}'
-                              : '${selected.courseCode} · ${selected.venueName} · ${selected.statusLabel}',
-                          style: AppTypography.description,
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        const Text(
-                          'Next step',
-                          style: AppTypography.bodyStrong,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          selected == null
-                              ? 'Select an assigned exam to unlock scripts and the rest of the workflow.'
-                              : selected.isScheduled
-                                  ? 'Start the session, then open verification to check students in.'
-                                  : selected.isInProgress
-                                      ? 'Continue verification, or open the attendance register to review check-ins.'
-                                      : 'Open the attendance register for the latest student list and check-in status.',
-                          style: AppTypography.description,
-                        ),
-                      ],
+            const SizedBox(height: AppSpacing.xl),
+            assignmentsAsync.when(
+              loading: () => const AppPageSkeleton(showMetrics: false),
+              error: (error, _) => AppPanel(
+                minHeight: 280,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _friendlyError(error),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 15, color: AppColors.brandRed),
                     ),
-                  ),
-                ],
-              );
-            },
+                    const SizedBox(height: AppSpacing.lg),
+                    SizedBox(
+                      width: 160,
+                      child: AppButton(
+                        label: 'Retry',
+                        expanded: true,
+                        onPressed: _refreshDashboard,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              data: (assignments) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_error != null) ...[
+                      AppErrorBanner(message: _error!, onRetry: _refreshDashboard),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                    const AppSectionHeader(
+                      title: 'Assigned exams',
+                      subtitle: 'Choose the exam you are invigilating now.',
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    ExamAssignmentCarousel(
+                      assignments: assignments,
+                      selected: selected,
+                      onSelect: (assignment) {
+                        ref.read(selectedExamProvider.notifier).select(assignment);
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.section),
+                    _buildScriptsPanel(selected),
+                    const SizedBox(height: AppSpacing.section),
+                    const AppSectionHeader(
+                      title: 'Quick actions',
+                      subtitle: 'Start the exam before verifying students. Ending a session closes check-in.',
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    _buildQuickActions(selected),
+                    const SizedBox(height: AppSpacing.section),
+                    AppPanel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Current selection',
+                            style: AppTypography.bodyStrong,
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            selected == null
+                                ? '${_summary['currentSession'] ?? 'No exam selected'}'
+                                : '${selected.courseCode} · ${selected.venueName} · ${selected.statusLabel}',
+                            style: AppTypography.description,
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          const Text(
+                            'Next step',
+                            style: AppTypography.bodyStrong,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            selected == null
+                                ? 'Select an assigned exam to unlock scripts and the rest of the workflow.'
+                                : selected.isScheduled
+                                    ? 'Start the session, then open verification to check students in.'
+                                    : selected.isInProgress
+                                        ? 'Continue verification, or open the attendance register to review check-ins.'
+                                        : 'Open the attendance register for the latest student list and check-in status.',
+                            style: AppTypography.description,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
           ),
         ],
+        ),
       ),
     );
   }

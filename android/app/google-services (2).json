@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "814801505624",
+    "project_id": "examattendance-4a678",
+    "storage_bucket": "examattendance-4a678.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:814801505624:android:5f2675c8c4066b47fbe92d",
+        "android_client_info": {
+          "package_name": "com.example.invigilator_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdPd-47nVyKVuIScH4G4n-8cufK1iLOnU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
