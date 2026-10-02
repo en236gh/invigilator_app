@@ -12,18 +12,13 @@ class AppCanvas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: AppColors.background,
-      ),
+      decoration: const BoxDecoration(color: AppColors.background),
       child: DecoratedBox(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
             center: Alignment.bottomLeft,
             radius: 1.05,
-            colors: [
-              Color(0x14008B45),
-              Colors.transparent,
-            ],
+            colors: [Color(0x14008B45), Colors.transparent],
             stops: [0.0, 0.55],
           ),
         ),
@@ -39,16 +34,19 @@ class AppPageBody extends StatefulWidget {
     super.key,
     required this.child,
     this.scrollable = true,
+    this.onRefresh,
   });
 
   final Widget child;
   final bool scrollable;
+  final Future<void> Function()? onRefresh;
 
   @override
   State<AppPageBody> createState() => _AppPageBodyState();
 }
 
-class _AppPageBodyState extends State<AppPageBody> with SingleTickerProviderStateMixin {
+class _AppPageBodyState extends State<AppPageBody>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 450),
@@ -88,6 +86,13 @@ class _AppPageBodyState extends State<AppPageBody> with SingleTickerProviderStat
 
     if (!widget.scrollable) return content;
 
-    return SingleChildScrollView(child: content);
+    final scrollView = SingleChildScrollView(
+      physics: widget.onRefresh != null
+          ? const AlwaysScrollableScrollPhysics()
+          : null,
+      child: content,
+    );
+    if (widget.onRefresh == null) return scrollView;
+    return RefreshIndicator(onRefresh: widget.onRefresh!, child: scrollView);
   }
 }

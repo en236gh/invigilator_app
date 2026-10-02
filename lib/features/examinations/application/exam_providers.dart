@@ -66,7 +66,10 @@ class SelectedExamNotifier extends Notifier<ExamAssignment?> {
           assignment.venueName != current.venueName ||
           assignment.startTime != current.startTime ||
           assignment.endTime != current.endTime ||
-          assignment.building != current.building;
+          assignment.building != current.building ||
+          assignment.campus != current.campus ||
+          assignment.capacity != current.capacity ||
+          assignment.studentCount != current.studentCount;
       if (changed) {
         state = assignment;
       }

@@ -1,3 +1,4 @@
+import '../../features/offline/data/offline_repository.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -15,8 +16,12 @@ class AppDatabase {
 
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await OfflineRepository.createTables(db);
+      },
       onCreate: (db, version) async {
+        await OfflineRepository.createTables(db);
         await db.execute('''
           CREATE TABLE exams(
             id INTEGER PRIMARY KEY AUTOINCREMENT,

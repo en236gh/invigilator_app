@@ -1,3 +1,4 @@
+import 'package:synchronized/synchronized.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -5,7 +6,21 @@ import '../../../core/network/api_client.dart';
 import '../domain/user.dart';
 
 class AuthRepository {
-  Dio get _dio => ApiClient.instance;
+  AuthRepository({Dio? dio}) : _client = dio;
+  final Dio? _client;
+  Dio get _dio => _client ?? ApiClient.instance;
+  static int _sessionVersion = 0;
+  static int get sessionVersion => _sessionVersion;
+  static final _credentialsLock = Lock();
+
+  Future<({String? access, String? owner, int sessionVersion})>
+  requestIdentity() => _credentialsLock.synchronized(
+    () async => (
+      access: await _storage.read(key: _accessTokenKey),
+      owner: await _storage.read(key: 'offlineStaffId'),
+      sessionVersion: _sessionVersion,
+    ),
+  );
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   static const String _accessTokenKey = 'accessToken';
@@ -14,6 +29,7 @@ class AuthRepository {
 
   /// Access token expiry in seconds (5 minutes).
   static const int _accessTokenExpirySeconds = 300;
+
   /// Refresh proactively when this many seconds remain (60 seconds).
   static const int _refreshBeforeExpirySeconds = 60;
 
@@ -37,15 +53,45 @@ class AuthRepository {
     final access = body != null ? body['accessToken'] as String? : null;
     final refresh = body != null ? body['refreshToken'] as String? : null;
 
-    await _storeTokens(access, refresh);
-
-    final user = body != null && body['user'] != null
+    if (access == null ||
+        access.isEmpty ||
+        refresh == null ||
+        refresh.isEmpty) {
+      throw const FormatException('Incomplete login credentials');
+    }
+    final user = body != null && body['user'] is Map
         ? User.fromMap(body['user'])
         : User(email: email);
+    await _credentialsLock.synchronized(() async {
+      _sessionVersion++;
+      await _storage.delete(key: 'staffId');
+      await _storage.delete(key: 'offlineStaffId');
+      await _storeTokens(access, refresh);
+    });
     return user;
   }
 
-  Future<bool> refreshToken() async {
+  /// Bind server-returned ownership only to the session that requested it.
+  Future<void> bindOfflineOwner(String owner, int version) =>
+      _credentialsLock.synchronized(() async {
+        if (version != _sessionVersion ||
+            (await _storage.read(key: _accessTokenKey))?.isNotEmpty != true) {
+          throw StateError('Account changed during download. Sign in again.');
+        }
+        final existing = await _storage.read(key: 'offlineStaffId');
+        if (existing != null && existing != owner) {
+          throw StateError('Snapshot ownership changed. Sign in again.');
+        }
+        await _storage.write(key: 'offlineStaffId', value: owner);
+      });
+
+  static Future<bool>? _refreshing;
+
+  Future<bool> refreshToken() =>
+      _refreshing ??= _refreshOnce().whenComplete(() => _refreshing = null);
+
+  Future<bool> _refreshOnce() async {
+    final version = _sessionVersion;
     final refresh = await _storage.read(key: _refreshTokenKey);
     if (refresh == null || refresh.isEmpty) return false;
 
@@ -58,12 +104,18 @@ class AuthRepository {
       final access = body != null ? body['accessToken'] as String? : null;
       final newRefresh = body != null ? body['refreshToken'] as String? : null;
 
-      if (access != null && access.isNotEmpty) {
-        await _storeTokens(access, newRefresh);
-        return true;
+      if (access != null &&
+          access.isNotEmpty &&
+          newRefresh != null &&
+          newRefresh.isNotEmpty) {
+        return _credentialsLock.synchronized(() async {
+          if (version != _sessionVersion) return false;
+          await _storeTokens(access, newRefresh);
+          return true;
+        });
       }
     } catch (e) {
-      await logout();
+      // Network failure must not destroy the rotating refresh credential.
       return false;
     }
     return false;
@@ -90,11 +142,14 @@ class AuthRepository {
     return true;
   }
 
-  Future<void> logout() async {
+  Future<void> logout() => _credentialsLock.synchronized(() async {
+    _sessionVersion++;
+    await _storage.delete(key: 'staffId');
+    await _storage.delete(key: 'offlineStaffId');
     await _storage.delete(key: _accessTokenKey);
     await _storage.delete(key: _refreshTokenKey);
     await _storage.delete(key: _tokenTimestampKey);
-  }
+  });
 
   Future<String?> getAccessToken() async {
     return _storage.read(key: _accessTokenKey);

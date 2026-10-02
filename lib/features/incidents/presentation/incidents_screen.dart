@@ -431,6 +431,7 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
     });
 
     return AppPageBody(
+      onRefresh: () => _refreshIncidents(ref.read(selectedExamProvider)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

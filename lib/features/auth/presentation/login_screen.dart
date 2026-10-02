@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../../offline/application/offline_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -35,6 +37,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       if (!mounted) return;
       ref.read(currentUserProvider.notifier).setUser(user);
+      unawaited(ref.read(offlineProvider).download());
       context.go('/');
     } catch (e) {
       if (mounted) {

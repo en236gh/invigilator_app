@@ -11,6 +11,8 @@ class ExamAssignment {
     required this.building,
     required this.capacity,
     required this.lecturers,
+    this.studentCount,
+    this.campus,
   });
 
   final int examSessionId;
@@ -23,6 +25,8 @@ class ExamAssignment {
   final String venueName;
   final String building;
   final int capacity;
+  final int? studentCount;
+  final String? campus;
   final List<String> lecturers;
 
   bool get isInProgress => examStatus == 'IN_PROGRESS';
@@ -61,6 +65,8 @@ class ExamAssignment {
     String? building,
     int? capacity,
     List<String>? lecturers,
+    int? studentCount,
+    String? campus,
   }) {
     return ExamAssignment(
       examSessionId: examSessionId ?? this.examSessionId,
@@ -74,6 +80,8 @@ class ExamAssignment {
       building: building ?? this.building,
       capacity: capacity ?? this.capacity,
       lecturers: lecturers ?? this.lecturers,
+      studentCount: studentCount ?? this.studentCount,
+      campus: campus ?? this.campus,
     );
   }
 
@@ -90,8 +98,12 @@ class ExamAssignment {
     }
 
     return ExamAssignment(
-      examSessionId: map['examSessionId'] is int ? map['examSessionId'] as int : int.tryParse('${map['examSessionId']}') ?? 0,
-      venueId: map['venueId'] is int ? map['venueId'] as int : int.tryParse('${map['venueId']}') ?? 0,
+      examSessionId: map['examSessionId'] is int
+          ? map['examSessionId'] as int
+          : int.tryParse('${map['examSessionId']}') ?? 0,
+      venueId: map['venueId'] is int
+          ? map['venueId'] as int
+          : int.tryParse('${map['venueId']}') ?? 0,
       courseCode: '${map['courseCode'] ?? ''}',
       examDate: '${map['examDate'] ?? ''}',
       startTime: '${map['startTime'] ?? ''}',
@@ -99,8 +111,15 @@ class ExamAssignment {
       examStatus: '${map['examStatus'] ?? ''}',
       venueName: '${map['venueName'] ?? ''}',
       building: '${map['building'] ?? ''}',
-      capacity: map['capacity'] is int ? map['capacity'] as int : int.tryParse('${map['capacity']}') ?? 0,
+      capacity: map['capacity'] is int
+          ? map['capacity'] as int
+          : int.tryParse('${map['capacity']}') ?? 0,
       lecturers: lecturers,
+      studentCount: int.tryParse('${map["studentCount"] ?? ""}'),
+      campus:
+          map["campus"] is String && (map["campus"] as String).trim().isNotEmpty
+          ? map["campus"] as String
+          : null,
     );
   }
 }

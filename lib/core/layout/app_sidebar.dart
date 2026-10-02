@@ -22,10 +22,27 @@ class AppNavItem {
 
 const List<AppNavItem> kAppNavItems = [
   AppNavItem(label: 'dashboard', path: '/', icon: Icons.dashboard_outlined),
-  AppNavItem(label: 'verification', path: '/verification', icon: Icons.verified_user_outlined),
-  AppNavItem(label: 'attendance', path: '/attendance', icon: Icons.fact_check_outlined),
-  AppNavItem(label: 'incidents', path: '/incidents', icon: Icons.report_outlined),
-  AppNavItem(label: 'sync', path: '/sync', icon: Icons.sync_outlined),
+  AppNavItem(
+    label: 'verification',
+    path: '/verification',
+    icon: Icons.verified_user_outlined,
+  ),
+  AppNavItem(
+    label: 'attendance',
+    path: '/attendance',
+    icon: Icons.fact_check_outlined,
+  ),
+  AppNavItem(
+    label: 'incidents',
+    path: '/incidents',
+    icon: Icons.report_outlined,
+  ),
+  AppNavItem(
+    label: 'Offline attendance',
+    path: '/offline-attendance',
+    icon: Icons.offline_bolt_outlined,
+  ),
+  AppNavItem(label: 'Sync', path: '/sync', icon: Icons.sync_outlined),
 ];
 
 class AppSidebar extends ConsumerWidget {
@@ -57,7 +74,9 @@ class AppSidebar extends ConsumerWidget {
       width: compact ? 88 : AppSpacing.sidebarWidth,
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: const BorderRadius.horizontal(right: Radius.circular(AppSpacing.radius)),
+        borderRadius: const BorderRadius.horizontal(
+          right: Radius.circular(AppSpacing.radius),
+        ),
         boxShadow: AppShadows.sidebar,
       ),
       child: SafeArea(
@@ -87,10 +106,10 @@ class AppSidebar extends ConsumerWidget {
                         active: _isActive(item.path),
                         compact: compact,
                         onTap: () {
-                          if (currentPath != item.path) {
-                            context.go(item.path);
-                          }
                           onNavigate?.call();
+                          if (currentPath != item.path) {
+                            context.push(item.path);
+                          }
                         },
                       ),
                   ],
@@ -102,11 +121,17 @@ class AppSidebar extends ConsumerWidget {
                   onPressed: () => _signOut(context, ref),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.muted,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
                   child: compact
                       ? const Icon(Icons.logout, size: 20)
-                      : const Text('Sign out', style: TextStyle(fontWeight: FontWeight.w500)),
+                      : const Text(
+                          'Sign out',
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
                 ),
               ),
             ],

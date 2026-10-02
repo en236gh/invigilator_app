@@ -3,9 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/auth_repository.dart';
 import '../domain/user.dart';
 
-final authRepositoryProvider = Provider<AuthRepository>((ref) => AuthRepository());
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => AuthRepository(),
+);
 
-final currentUserProvider = StateNotifierProvider<CurrentUserNotifier, User?>((ref) {
+final currentUserProvider = StateNotifierProvider<CurrentUserNotifier, User?>((
+  ref,
+) {
   return CurrentUserNotifier();
 });
 

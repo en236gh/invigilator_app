@@ -16,6 +16,7 @@ import 'package:invigilator_app/features/examinations/application/exam_providers
 import 'package:invigilator_app/features/examinations/domain/exam_assignment.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../examinations/application/session_flow_controller.dart';
 import '../data/verification_repository.dart';
 import '../domain/verification_models.dart';
 import 'widgets/qr_scanner_panel.dart';
@@ -43,8 +44,11 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
         formats: const [BarcodeFormat.qrCode],
       );
 
+  final ValueNotifier<int> _detailsRevision = ValueNotifier(0);
+
   bool _actionInProgress = false;
   bool _sessionActionInProgress = false;
+  bool _confirmingStart = false;
   bool _scannerPaused = false;
   VerificationMode _mode = VerificationMode.computerNumber;
   StudentPreview? _studentPreview;
@@ -71,16 +75,20 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     return selected != null && !selected.isCompleted;
   }
 
-  bool get _canStartSession => _selectedAssignment?.isScheduled == true;
+  bool get _canStartSession =>
+      _selectedAssignment?.isScheduled == true &&
+      ref.read(sessionFlowProvider).flow == null;
   bool get _canEndSession => _selectedAssignment?.isInProgress == true;
   bool get _canCheckIn =>
       _attendanceAvailable &&
       _studentPreview != null &&
       !_studentPreview!.alreadyCheckedIn &&
-      !_actionInProgress;
+      !_actionInProgress &&
+      !_sessionActionInProgress;
 
   @override
   void dispose() {
+    _detailsRevision.dispose();
     _computerNumberController.dispose();
     _qrTokenController.dispose();
     _scannerController.dispose();
@@ -89,100 +97,74 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
 
   Future<void> _startSession() async {
     final assignment = _selectedAssignment;
-    if (assignment == null || !_canStartSession || _sessionActionInProgress) {
+    if (assignment == null ||
+        !_canStartSession ||
+        _sessionActionInProgress ||
+        _confirmingStart ||
+        _actionInProgress) {
       return;
     }
 
     setState(() {
-      _sessionActionInProgress = true;
+      _confirmingStart = true;
       _errorMessage = null;
       _feedbackMessage = null;
     });
 
     try {
-      final status = await ref
-          .read(examRepositoryProvider)
-          .startSession(
-            examSessionId: assignment.examSessionId,
-            venueId: assignment.venueId,
-          );
-      await ref.read(examAssignmentsProvider.notifier).refresh();
-      if (!mounted) return;
-      setState(() {
-        _feedbackMessage = status == 'IN_PROGRESS'
-            ? 'Session started. You can now look up and check in students.'
-            : 'Session updated to ${status.replaceAll('_', ' ')}.';
-        _studentPreview = null;
-        _verificationResult = null;
-      });
-      if (_mode == VerificationMode.qrCode) {
-        await _resumeScanner();
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = _friendlyError(error);
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _sessionActionInProgress = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _endSession() async {
-    final assignment = _selectedAssignment;
-    if (assignment == null || !_canEndSession || _sessionActionInProgress) {
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('End examination session?'),
-        content: const Text(
-          'This marks the exam as completed and records ABSENT for allocated students with no attendance. Further check-ins will be blocked.',
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Start exam session?'),
+          content: Text(
+            'Have you finished recording attendance for all students in ${assignment.courseCode} at ${assignment.venueName}?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('No'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Yes, start session'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('End session'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() {
-      _sessionActionInProgress = true;
-      _errorMessage = null;
-      _feedbackMessage = null;
-    });
-
-    try {
-      final status = await ref
-          .read(examRepositoryProvider)
-          .endSession(
-            examSessionId: assignment.examSessionId,
-            venueId: assignment.venueId,
-          );
-      await ref.read(examAssignmentsProvider.notifier).refresh();
+      );
       if (!mounted) return;
-      setState(() {
-        _feedbackMessage =
-            'Session ended (${status.replaceAll('_', ' ')}). Check-in is now closed for this venue.';
-        _studentPreview = null;
-        _verificationResult = null;
-      });
-      if (_mode == VerificationMode.qrCode) {
-        await _scannerController.stop();
+      if (confirmed != true) {
+        if (confirmed == false) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Record all students before clicking Start exam session.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      // Confirmation applies only to the exam shown in the dialog.
+      if (!assignment.sameAs(_selectedAssignment) || !_canStartSession) return;
+      setState(() => _sessionActionInProgress = true);
+      final flow = ref.read(sessionFlowProvider);
+      await flow.start(assignment);
+      if (!mounted) return;
+      if (flow.flow != null) {
+        if (flow.flow!.step == SessionStep.running) {
+          ref
+              .read(selectedExamProvider.notifier)
+              .select(assignment.copyWith(examStatus: 'IN_PROGRESS'));
+        }
+        context.go('/');
+      } else {
+        _showError(
+          flow.error ?? 'Could not start the exam session. Please retry.',
+        );
       }
     } catch (error) {
       if (mounted) {
@@ -194,10 +176,13 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
       if (mounted) {
         setState(() {
           _sessionActionInProgress = false;
+          _confirmingStart = false;
         });
       }
     }
   }
+
+  void _openSessionDashboard() => context.go('/');
 
   Future<void> _lookupComputerNumber() async {
     if (_selectedAssignment == null || !_attendanceAvailable) {
@@ -225,6 +210,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
         _errorMessage = null;
       });
     });
+    if (mounted && _studentPreview != null && _errorMessage == null) {
+      await _showStudentDetails();
+    }
   }
 
   Future<void> _checkInComputerNumber() async {
@@ -292,6 +280,10 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
         _errorMessage = null;
       });
     });
+
+    if (mounted && _studentPreview != null && _errorMessage == null) {
+      await _showStudentDetails();
+    }
 
     if (_errorMessage != null && fromScan) {
       await _resumeScanner();
@@ -365,6 +357,8 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     if (!_attendanceAvailable ||
         _mode != VerificationMode.qrCode ||
         _scannerPaused ||
+        _sessionActionInProgress ||
+        _confirmingStart ||
         _actionInProgress) {
       return;
     }
@@ -436,12 +430,84 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     }
   }
 
+  Future<void> _showStudentDetails() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (detailsContext) => ValueListenableBuilder<int>(
+          valueListenable: _detailsRevision,
+          builder: (context, revision, child) => PopScope(
+            canPop: !_actionInProgress,
+            child: Scaffold(
+              appBar: AppBar(title: const Text('Student details')),
+              body: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildStudentSummary(),
+                      const SizedBox(height: AppSpacing.lg),
+                      if (_errorMessage != null || _feedbackMessage != null)
+                        _buildStatusCard(),
+                      const SizedBox(height: AppSpacing.lg),
+                      AppButton(
+                        label: 'Check in',
+                        loading: _actionInProgress,
+                        onPressed: _canCheckIn
+                            ? (_mode == VerificationMode.qrCode
+                                  ? _checkInByQr
+                                  : _checkInComputerNumber)
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              bottomNavigationBar: SafeArea(
+                minimum: const EdgeInsets.all(AppSpacing.lg),
+                child: SizedBox(
+                  height: 52,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: _actionInProgress
+                        ? null
+                        : () => Navigator.of(detailsContext).pop(),
+                    child: const Text('Next student'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() {
+      _computerNumberController.clear();
+      _qrTokenController.clear();
+      _studentPreview = null;
+      _verificationResult = null;
+      _feedbackMessage = null;
+      _errorMessage = null;
+    });
+    if (_mode == VerificationMode.qrCode) {
+      await _resumeScanner();
+    }
+  }
+
   Future<void> _runAction(Future<void> Function() action) async {
     setState(() {
       _actionInProgress = true;
       _feedbackMessage = null;
       _errorMessage = null;
     });
+
+    _detailsRevision.value++;
 
     try {
       await action();
@@ -457,6 +523,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
         setState(() {
           _actionInProgress = false;
         });
+        _detailsRevision.value++;
       }
     }
   }
@@ -606,8 +673,6 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                     children: [
                       Text(
                         preview.fullName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -617,8 +682,6 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                       const SizedBox(height: 4),
                       Text(
                         preview.program,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 13,
                           color: AppColors.muted,
@@ -734,7 +797,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
           Text(
             assignment.isCompleted
                 ? 'This session is closed. Check-in is blocked for this venue.'
-                : 'Attendance can be recorded for students allocated to this exam while it is not completed.',
+                : assignment.isScheduled
+                ? 'Record attendance for all students, then start the exam session.'
+                : 'Exam session in progress. Attendance can still be recorded.',
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.muted,
@@ -748,10 +813,10 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                 if (_canStartSession)
                   Expanded(
                     child: AppButton(
-                      label: 'Start session',
+                      label: 'Start exam session',
                       icon: Icons.play_arrow,
                       loading: _sessionActionInProgress,
-                      onPressed: _startSession,
+                      onPressed: _actionInProgress ? null : _startSession,
                     ),
                   ),
                 if (_canStartSession && _canEndSession)
@@ -759,11 +824,11 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                 if (_canEndSession)
                   Expanded(
                     child: AppButton(
-                      label: 'End session',
-                      variant: AppButtonVariant.danger,
-                      icon: Icons.stop_circle_outlined,
+                      label: 'View session timer',
+                      variant: AppButtonVariant.secondary,
+                      icon: Icons.timer_outlined,
                       loading: _sessionActionInProgress,
-                      onPressed: _endSession,
+                      onPressed: _openSessionDashboard,
                     ),
                   ),
               ],
@@ -775,7 +840,8 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   }
 
   Widget _buildQrMethodForm() {
-    final lookupEnabled = _attendanceAvailable && !_actionInProgress;
+    final lookupEnabled =
+        _attendanceAvailable && !_actionInProgress && !_sessionActionInProgress;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -839,7 +905,8 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   }
 
   Widget _buildComputerNumberForm() {
-    final lookupEnabled = _attendanceAvailable && !_actionInProgress;
+    final lookupEnabled =
+        _attendanceAvailable && !_actionInProgress && !_sessionActionInProgress;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -896,6 +963,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   @override
   Widget build(BuildContext context) {
     final selected = ref.watch(selectedExamProvider);
+    ref.watch(sessionFlowProvider);
     final assignmentsAsync = ref.watch(examAssignmentsProvider);
 
     ref.listen<ExamAssignment?>(selectedExamProvider, (previous, next) {
@@ -915,6 +983,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     });
 
     return AppPageBody(
+      onRefresh: () => ref.read(examAssignmentsProvider.notifier).refresh(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -922,6 +991,11 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
             title: 'Student verification',
             subtitle:
                 'Confirm identity using computer number or examination pass QR code.',
+          ),
+          TextButton.icon(
+            onPressed: () => context.push('/offline-attendance'),
+            icon: const Icon(Icons.offline_bolt),
+            label: const Text('Use downloaded roster / offline capture'),
           ),
           const SizedBox(height: AppSpacing.xl),
           if (assignmentsAsync.isLoading && selected == null)
@@ -1014,7 +1088,6 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                     const SizedBox(height: AppSpacing.lg),
                     _buildStatusCard(),
                   ],
-                  _buildStudentSummary(),
                 ],
               ),
             ),

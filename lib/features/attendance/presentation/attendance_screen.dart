@@ -15,6 +15,7 @@ import '../../../core/widgets/app_panel.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../../examinations/application/exam_providers.dart';
 import '../../examinations/domain/exam_assignment.dart';
+import '../../examinations/application/session_flow_controller.dart';
 import '../data/attendance_repository.dart';
 import '../domain/attendance_models.dart';
 
@@ -29,7 +30,6 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
   final AttendanceRepository _attendanceRepository = AttendanceRepository();
 
   bool _loading = false;
-  bool _endingSession = false;
   String? _error;
   List<AttendanceRecord> _attendanceRecords = [];
   int? _loadedExamSessionId;
@@ -46,53 +46,14 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
   }
 
   Future<void> _endSession() async {
-    final assignment = ref.read(selectedExamProvider);
-    if (assignment == null || !assignment.isInProgress || _endingSession) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('End examination session?'),
-        content: const Text(
-          'This marks the exam as completed and records ABSENT for allocated students with no attendance. Further check-ins will be blocked.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('End session')),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    setState(() {
-      _endingSession = true;
-      _error = null;
-    });
-
-    try {
-      await ref.read(examRepositoryProvider).endSession(
-            examSessionId: assignment.examSessionId,
-            venueId: assignment.venueId,
-          );
-      await ref.read(examAssignmentsProvider.notifier).refresh();
-      await _refreshAttendance(ref.read(selectedExamProvider));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${assignment.courseCode} session ended. Remaining students marked absent.')),
-      );
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _error = _friendlyError(error);
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _endingSession = false;
-        });
-      }
+    final selected = ref.read(selectedExamProvider);
+    final flow = ref.read(sessionFlowProvider);
+    await flow.ready;
+    if (!mounted) return;
+    if (flow.flow?.assignment.sameAs(selected) == true) {
+      await flow.requestScripts();
     }
+    if (mounted) context.go('/');
   }
 
   Future<void> _refreshAttendance(ExamAssignment? assignment) async {
@@ -146,14 +107,16 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
       if (error.response?.statusCode == 401) {
         return 'Please sign in again to refresh your session.';
       }
-      if (error.response?.statusCode == 400 || error.response?.statusCode == 409) {
+      if (error.response?.statusCode == 400 ||
+          error.response?.statusCode == 409) {
         final serverMessage = error.response?.data is Map
             ? '${(error.response!.data as Map)['message'] ?? (error.response!.data as Map)['error'] ?? ''}'
             : '';
         if (serverMessage.isNotEmpty) return serverMessage;
         return 'Unable to update the exam session. Please try again.';
       }
-      if (error.type == DioExceptionType.connectionTimeout || error.type == DioExceptionType.receiveTimeout) {
+      if (error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout) {
         return 'Connection timed out. Check your network and tap retry.';
       }
       if (error.type == DioExceptionType.badResponse) {
@@ -200,12 +163,11 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
               label: 'End examination session',
               variant: AppButtonVariant.danger,
               icon: Icons.stop_circle_outlined,
-              loading: _endingSession,
               onPressed: _endSession,
             ),
             const SizedBox(height: AppSpacing.sm),
             const Text(
-              'Ending the session closes check-in and marks remaining allocated students as absent.',
+              'Enter the scripts count on the dashboard before ending this session.',
               style: TextStyle(fontSize: 13, color: AppColors.muted),
             ),
           ],
@@ -227,13 +189,53 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppPanel(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
           child: const Row(
             children: [
-              Expanded(flex: 2, child: Text('Student', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted))),
-              Expanded(child: Text('Seat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted))),
-              Expanded(child: Text('Status', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted))),
-              Expanded(child: Text('Method', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.muted))),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  'Student',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'Seat',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'Status',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'Method',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.muted,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -259,14 +261,21 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
                     record.fullName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.ink),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${record.computerNumber} • ${record.program}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, color: AppColors.muted),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.muted,
+                    ),
                   ),
                 ],
               ),
@@ -313,18 +322,21 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     });
 
     return AppPageBody(
+      onRefresh: () => _refreshAttendance(ref.read(selectedExamProvider)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AppPageHeader(
             title: 'Attendance register',
-            subtitle: 'Review students allocated to the exam selected on the dashboard.',
+            subtitle:
+                'Review students allocated to the exam selected on the dashboard.',
           ),
           const SizedBox(height: AppSpacing.xl),
           if (selected == null) ...[
             const AppEmptyState(
               title: 'No exam selected',
-              message: 'Choose an assigned exam on the dashboard to load its attendance register.',
+              message:
+                  'Choose an assigned exam on the dashboard to load its attendance register.',
               icon: Icons.list_alt_outlined,
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -336,7 +348,10 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
             _buildSessionActions(selected),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.lg),
-              AppErrorBanner(message: _error!, onRetry: () => _refreshAttendance(selected)),
+              AppErrorBanner(
+                message: _error!,
+                onRetry: () => _refreshAttendance(selected),
+              ),
             ],
             const SizedBox(height: AppSpacing.xl),
             if (_loading)
