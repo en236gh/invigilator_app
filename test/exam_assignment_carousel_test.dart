@@ -58,7 +58,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Exam 2 of 3'), findsOneWidget);
       expect(find.text('CSC 2').hitTestable(), findsOneWidget);
-      expect(find.text('Expected attendance: 64').hitTestable(), findsOneWidget);
+      expect(
+        find.text('Expected attendance: 64').hitTestable(),
+        findsOneWidget,
+      );
       expect(selected, isNull);
       await tester.tap(find.text('CSC 2'));
       await tester.pumpAndSettle();
@@ -112,7 +115,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('CSC 2').hitTestable(), findsOneWidget);
-      expect(find.text('Expected attendance: 64').hitTestable(), findsOneWidget);
+      expect(
+        find.text('Expected attendance: 64').hitTestable(),
+        findsOneWidget,
+      );
       final venue = tester.widget<Text>(find.text(exams[1].venueName));
       expect(venue.maxLines, isNull);
       expect(venue.overflow, isNull);
