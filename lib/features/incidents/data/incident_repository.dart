@@ -4,7 +4,9 @@ import '../../../core/network/api_client.dart';
 import '../domain/incident_models.dart';
 
 class IncidentRepository {
-  final Dio _dio = ApiClient.instance;
+  IncidentRepository({Dio? dio}) : _dio = dio ?? ApiClient.instance;
+
+  final Dio _dio;
 
   Future<List<IncidentRecord>> fetchIncidents() async {
     final resp = await _dio.get('/api/incidents');
@@ -24,6 +26,7 @@ class IncidentRepository {
     String? computerNumber,
     required String incidentType,
     required String description,
+    String severity = 'MAJOR',
     String? evidencePath,
   }) async {
     final resp = await _dio.post(
@@ -31,11 +34,13 @@ class IncidentRepository {
       data: {
         'examSessionId': examSessionId,
         'venueId': venueId,
-        if (computerNumber != null && computerNumber.isNotEmpty) 'computerNumber': computerNumber,
+        if (computerNumber != null && computerNumber.isNotEmpty)
+          'computerNumber': computerNumber,
         'incidentType': incidentType,
         'description': description,
-        'severity': 'MAJOR',
-        if (evidencePath != null && evidencePath.isNotEmpty) 'evidencePath': evidencePath,
+        'severity': severity,
+        if (evidencePath != null && evidencePath.isNotEmpty)
+          'evidencePath': evidencePath,
       },
     );
 

@@ -5,13 +5,11 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/constants/app_colors.dart';
 import '../../../app/constants/app_spacing.dart';
-import '../../../core/widgets/app_badge.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/app_canvas.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/app_error_banner.dart';
 import '../../../core/widgets/app_page_header.dart';
-import '../../../core/widgets/app_panel.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../../examinations/application/exam_providers.dart';
 import '../../examinations/domain/exam_assignment.dart';
@@ -29,6 +27,7 @@ class AttendanceScreen extends ConsumerStatefulWidget {
 class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
   final AttendanceRepository _attendanceRepository = AttendanceRepository();
 
+  String _searchQuery = '';
   bool _loading = false;
   String? _error;
   List<AttendanceRecord> _attendanceRecords = [];
@@ -128,44 +127,74 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     return 'Something went wrong while loading attendance.';
   }
 
+  Widget _surface(Widget child) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: AppColors.ink.withValues(alpha: 0.06)),
+    ),
+    child: child,
+  );
+
+  Widget _action({
+    required String label,
+    required IconData icon,
+    required VoidCallback? onPressed,
+    bool primary = false,
+  }) => ElevatedButton(
+    onPressed: onPressed,
+    style: ElevatedButton.styleFrom(
+      elevation: 0,
+      backgroundColor: primary ? AppColors.ink : Colors.white,
+      foregroundColor: primary ? Colors.white : AppColors.ink,
+      minimumSize: const Size(double.infinity, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      side: primary
+          ? BorderSide.none
+          : BorderSide(color: AppColors.ink.withValues(alpha: 0.12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 20),
+        const SizedBox(width: 10),
+        Flexible(child: Text(label, textAlign: TextAlign.center)),
+      ],
+    ),
+  );
+
   Widget _buildSessionActions(ExamAssignment assignment) {
-    return AppPanel(
-      child: Column(
+    return _surface(
+      Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: AppButton(
-                  label: 'Refresh attendance',
-                  variant: AppButtonVariant.secondary,
-                  onPressed: () => _refreshAttendance(assignment),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: AppButton(
-                  label: 'Open verification',
-                  variant: AppButtonVariant.secondary,
-                  onPressed: () async {
-                    await context.push('/verification');
-                    if (mounted) {
-                      await _refreshAttendance(ref.read(selectedExamProvider));
-                    }
-                  },
-                ),
-              ),
-            ],
+          _action(
+            label: 'Verify Students',
+            icon: Icons.verified_user_outlined,
+            primary: true,
+            onPressed: () async {
+              await context.push('/verification');
+              if (mounted) {
+                await _refreshAttendance(ref.read(selectedExamProvider));
+              }
+            },
+          ),
+          const SizedBox(height: 12),
+          _action(
+            label: 'Refresh Attendance',
+            icon: Icons.refresh,
+            onPressed: _loading ? null : () => _refreshAttendance(assignment),
           ),
           if (assignment.isInProgress) ...[
-            const SizedBox(height: AppSpacing.md),
-            AppButton(
+            const SizedBox(height: 12),
+            _action(
               label: 'End examination session',
-              variant: AppButtonVariant.danger,
               icon: Icons.stop_circle_outlined,
               onPressed: _endSession,
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: 8),
             const Text(
               'Enter the scripts count on the dashboard before ending this session.',
               style: TextStyle(fontSize: 13, color: AppColors.muted),
@@ -176,137 +205,196 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
     );
   }
 
-  Widget _buildAttendanceList() {
-    if (_attendanceRecords.isEmpty) {
-      return const AppEmptyState(
-        title: 'No attendance records',
-        message: 'No attendance records are available for this session yet.',
-        icon: Icons.fact_check_outlined,
-      );
+  String _statusLabel(AttendanceRecord record) {
+    switch (record.attendanceStatus.trim().toUpperCase()) {
+      case 'PRESENT':
+        return 'Present';
+      case 'ABSENT':
+        return 'Absent';
+      default:
+        return 'Pending';
     }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppPanel(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.md,
-          ),
-          child: const Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: Text(
-                  'Student',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.muted,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  'Seat',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.muted,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  'Status',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.muted,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  'Method',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.muted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        ..._attendanceRecords.map(_buildAttendanceRow),
-      ],
-    );
   }
 
-  Widget _buildAttendanceRow(AttendanceRecord record) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: AppPanel(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Row(
-          children: [
-            Expanded(
-              flex: 2,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    record.fullName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${record.computerNumber} • ${record.program}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                ],
+  Widget _statusBadge(String status, {int? count}) {
+    final color = switch (status) {
+      'Present' => AppColors.brandGreen,
+      'Absent' => AppColors.brandRed,
+      _ => const Color(0xFF92400E),
+    };
+    final icon = switch (status) {
+      'Present' => Icons.check_circle_outline,
+      'Absent' => Icons.error_outline,
+      _ => Icons.schedule,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              count == null ? status : '$status: $count',
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            Expanded(
-              child: Text(
-                record.seatNumber,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14, color: AppColors.ink),
-              ),
-            ),
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: AppBadge.status(record.attendanceStatus),
-              ),
-            ),
-            Expanded(
-              child: Text(
-                record.verificationMethod.replaceAll('_', ' '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, color: AppColors.ink),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+
+  String _methodLabel(String method) {
+    final normalized = method.trim().replaceAll('_', ' ').toUpperCase();
+    switch (normalized) {
+      case 'QR':
+      case 'QR CODE':
+        return 'QR Code';
+      case 'MANUAL':
+        return 'Manual';
+      case 'BIOMETRIC':
+        return 'Biometric';
+      case '':
+        return 'Not recorded';
+      default:
+        return normalized
+            .split(' ')
+            .map(
+              (word) => word.isEmpty
+                  ? word
+                  : '${word[0]}${word.substring(1).toLowerCase()}',
+            )
+            .join(' ');
+    }
+  }
+
+  Widget _buildExamInformation(ExamAssignment assignment) => _surface(
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          assignment.courseCode,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ink,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(assignment.venueName),
+        const SizedBox(height: 4),
+        Text(
+          assignment.timeRangeLabel,
+          style: const TextStyle(color: AppColors.muted),
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildSummary() => _surface(
+    Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Attendance summary',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final status in ['Present', 'Absent', 'Pending'])
+              _statusBadge(
+                status,
+                count: _attendanceRecords
+                    .where((record) => _statusLabel(record) == status)
+                    .length,
+              ),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  Widget _buildAttendanceList() {
+    final query = _searchQuery.trim().toLowerCase();
+    final records = _attendanceRecords
+        .where(
+          (record) =>
+              record.computerNumber.toLowerCase().contains(query) ||
+              record.fullName.toLowerCase().contains(query) ||
+              record.seatNumber.toLowerCase().contains(query),
+        )
+        .toList();
+    if (records.isEmpty) {
+      return _surface(
+        AppEmptyState(
+          title: query.isEmpty
+              ? 'No attendance records'
+              : 'No matching students',
+          message: query.isEmpty
+              ? 'No attendance records are available for this session yet.'
+              : 'Try a different student number, name, or seat number.',
+          icon: Icons.person_search_outlined,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [for (final record in records) _buildAttendanceRow(record)],
+    );
+  }
+
+  Widget _buildAttendanceRow(AttendanceRecord record) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: _surface(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            record.computerNumber,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
+          ),
+          if (record.fullName.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(record.fullName, style: const TextStyle(fontSize: 14)),
+          ],
+          const SizedBox(height: 4),
+          Text(
+            'Seat ${record.seatNumber.isEmpty ? 'not allocated' : record.seatNumber}',
+            style: const TextStyle(fontSize: 13, color: AppColors.muted),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _statusBadge(_statusLabel(record)),
+              Text(
+                _methodLabel(record.verificationMethod),
+                style: const TextStyle(fontSize: 13, color: AppColors.muted),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -327,9 +415,8 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const AppPageHeader(
-            title: 'Attendance register',
-            subtitle:
-                'Review students allocated to the exam selected on the dashboard.',
+            title: 'Attendance',
+            subtitle: 'Review and record attendance for this examination.',
           ),
           const SizedBox(height: AppSpacing.xl),
           if (selected == null) ...[
@@ -345,6 +432,9 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
               onPressed: () => context.go('/'),
             ),
           ] else ...[
+            _buildExamInformation(selected),
+            const SizedBox(height: 16),
+            if (!_loading) ...[_buildSummary(), const SizedBox(height: 16)],
             _buildSessionActions(selected),
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.lg),
@@ -357,11 +447,28 @@ class _AttendanceScreenState extends ConsumerState<AttendanceScreen> {
             if (_loading)
               const AppPageSkeleton(showMetrics: false)
             else ...[
-              const AppSectionHeader(
-                title: 'Register',
-                subtitle: 'Students allocated to the selected exam session.',
+              TextField(
+                onChanged: (value) => setState(() => _searchQuery = value),
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: 'Search student',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide(
+                      color: AppColors.ink.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: 16),
+              AppSectionHeader(
+                title: 'Students (${_attendanceRecords.length})',
+                subtitle: 'Students allocated to this examination.',
+              ),
+              const SizedBox(height: 12),
               _buildAttendanceList(),
             ],
           ],

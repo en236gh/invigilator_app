@@ -11,7 +11,6 @@ import '../../../core/widgets/app_canvas.dart';
 import '../../../core/widgets/app_empty_state.dart';
 import '../../../core/widgets/app_error_banner.dart';
 import '../../../core/widgets/app_page_header.dart';
-import '../../../core/widgets/app_panel.dart';
 import '../../../core/widgets/app_skeleton.dart';
 import '../../examinations/application/exam_providers.dart';
 import '../../examinations/domain/exam_assignment.dart';
@@ -36,8 +35,10 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
       TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _evidencePathController = TextEditingController();
-  String _incidentType = 'PHONE_FOUND';
-  String _severity = 'MAJOR';
+  final _formKey = GlobalKey<FormState>();
+  String? _incidentType;
+  String? _severity;
+  bool _showEvidence = false;
   int? _loadedExamSessionId;
 
   @override
@@ -114,12 +115,7 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
       });
       return;
     }
-    if (_descriptionController.text.trim().isEmpty) {
-      setState(() {
-        _error = 'Describe the incident before submitting.';
-      });
-      return;
-    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
     setState(() {
       _savingIncident = true;
@@ -133,7 +129,8 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
         computerNumber: _computerNumberController.text.trim().isNotEmpty
             ? _computerNumberController.text.trim()
             : null,
-        incidentType: _incidentType,
+        incidentType: _incidentType!,
+        severity: _severity!,
         description: _descriptionController.text.trim(),
         evidencePath: _evidencePathController.text.trim().isNotEmpty
             ? _evidencePathController.text.trim()
@@ -143,6 +140,7 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
       _computerNumberController.clear();
       _descriptionController.clear();
       _evidencePathController.clear();
+      setState(() => _showEvidence = false);
       await _refreshIncidents(selected);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -183,112 +181,238 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
     return 'Something went wrong while loading incidents.';
   }
 
-  Widget _buildIncidentForm() {
-    return AppPanel(
+  String _humanLabel(String value) => value
+      .toLowerCase()
+      .split('_')
+      .map((word) => '${word[0].toUpperCase()}${word.substring(1)}')
+      .join(' ');
+
+  Widget _surface(Widget child) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: AppColors.ink.withValues(alpha: 0.06)),
+    ),
+    child: child,
+  );
+
+  Widget _field(String label, Widget child, {String? help}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Text(
+        label,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 6),
+      child,
+      if (help != null) ...[
+        const SizedBox(height: 6),
+        Text(
+          help,
+          style: const TextStyle(fontSize: 12, color: AppColors.muted),
+        ),
+      ],
+    ],
+  );
+
+  InputDecoration _input({String? hint}) => InputDecoration(
+    hintText: hint,
+    filled: true,
+    fillColor: Colors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: AppColors.ink.withValues(alpha: 0.2)),
+    ),
+    errorMaxLines: 3,
+  );
+
+  Widget _buildIncidentForm() => _surface(
+    Form(
+      key: _formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
             'Report a new incident',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.w600,
               color: AppColors.ink,
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              Expanded(
-                child: _buildDropdownField(
-                  'Type',
-                  _incidentType,
-                  [
-                    'CHEATING',
-                    'PHONE_FOUND',
-                    'WRONG_VENUE',
-                    'MEDICAL_EMERGENCY',
-                    'DISTURBANCE',
-                    'LATE_ARRIVAL',
-                    'OTHER',
-                  ],
-                  (value) => setState(() => _incidentType = value),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _buildDropdownField('Severity', _severity, [
-                  'MINOR',
-                  'MAJOR',
-                  'CRITICAL',
-                ], (value) => setState(() => _severity = value)),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextFormField(
-            controller: _computerNumberController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Student computer number (optional)',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextFormField(
-            controller: _descriptionController,
-            maxLines: 4,
-            decoration: const InputDecoration(labelText: 'Description'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          TextFormField(
-            controller: _evidencePathController,
-            decoration: const InputDecoration(
-              labelText: 'Evidence path (optional)',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          AppButton(
-            label: 'Report incident',
-            loading: _savingIncident,
-            onPressed: _reportIncident,
-          ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 4),
           const Text(
-            'Incidents are recorded against the exam selected on the dashboard.',
-            style: TextStyle(fontSize: 13, color: AppColors.muted),
+            '* Required',
+            style: TextStyle(fontSize: 12, color: AppColors.muted),
+          ),
+          const SizedBox(height: 12),
+          _field(
+            'Incident type *',
+            _buildDropdownField(
+              'incident type',
+              _incidentType,
+              [
+                'CHEATING',
+                'PHONE_FOUND',
+                'WRONG_VENUE',
+                'MEDICAL_EMERGENCY',
+                'DISTURBANCE',
+                'LATE_ARRIVAL',
+                'OTHER',
+              ],
+              (value) => setState(() => _incidentType = value),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _field(
+            'Severity *',
+            _buildDropdownField('severity', _severity, [
+              'MINOR',
+              'MAJOR',
+              'CRITICAL',
+            ], (value) => setState(() => _severity = value)),
+            help: switch (_severity) {
+              'MINOR' => 'Minor: a small disruption with limited impact.',
+              'MAJOR' =>
+                'Major: a significant disruption or suspected misconduct.',
+              'CRITICAL' =>
+                'Critical: an immediate safety risk or serious emergency.',
+              _ => 'Choose the level that best describes the incident.',
+            },
+          ),
+          const SizedBox(height: 12),
+          _field(
+            'Student number (optional)',
+            TextFormField(
+              enabled: !_savingIncident,
+              controller: _computerNumberController,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              decoration: _input(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _field(
+            'Description *',
+            TextFormField(
+              enabled: !_savingIncident,
+              controller: _descriptionController,
+              minLines: 3,
+              maxLines: 6,
+              textAlignVertical: TextAlignVertical.top,
+              keyboardType: TextInputType.multiline,
+              decoration: _input(),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Describe the incident before submitting.'
+                  : null,
+            ),
+            help: 'Include what happened, when, and the action taken.',
+          ),
+          const SizedBox(height: 12),
+          if (!_showEvidence)
+            OutlinedButton.icon(
+              onPressed: _savingIncident
+                  ? null
+                  : () => setState(() => _showEvidence = true),
+              icon: const Icon(Icons.link),
+              label: const Text(
+                'Add evidence link (optional)',
+                textAlign: TextAlign.center,
+              ),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(0, 48),
+                padding: const EdgeInsets.all(12),
+              ),
+            )
+          else ...[
+            _field(
+              'Evidence link (optional)',
+              TextFormField(
+                enabled: !_savingIncident,
+                controller: _evidencePathController,
+                keyboardType: TextInputType.url,
+                decoration: _input(),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return null;
+                  final uri = Uri.tryParse(value.trim());
+                  return uri != null &&
+                          ['https', 'http'].contains(uri.scheme) &&
+                          uri.host.isNotEmpty
+                      ? null
+                      : 'Enter a valid https:// link.';
+                },
+              ),
+              help: 'Paste a shared link to a photo or document.',
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _savingIncident
+                    ? null
+                    : () => setState(() {
+                        _evidencePathController.clear();
+                        _showEvidence = false;
+                      }),
+                icon: const Icon(Icons.close),
+                label: const Text('Remove evidence link'),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: _savingIncident ? null : _reportIncident,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.ink,
+              foregroundColor: Colors.white,
+              minimumSize: const Size(double.infinity, 48),
+              padding: const EdgeInsets.all(14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: Text(
+              _savingIncident ? 'Reporting incident…' : 'Report incident',
+              textAlign: TextAlign.center,
+            ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 
   Widget _buildDropdownField(
     String label,
-    String currentValue,
+    String? currentValue,
     List<String> options,
     ValueChanged<String> onChanged,
-  ) {
-    return DropdownButtonFormField<String>(
-      initialValue: currentValue,
-      isExpanded: true,
-      decoration: InputDecoration(labelText: label),
-      items: options
-          .map(
-            (value) => DropdownMenuItem(
-              value: value,
-              child: Text(
-                value.replaceAll('_', ' '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+  ) => DropdownButtonFormField<String>(
+    initialValue: currentValue,
+    isExpanded: true,
+    itemHeight: null,
+    decoration: _input(),
+    hint: Text('Select $label'),
+    validator: (value) => value == null ? 'Select $label.' : null,
+    items: options
+        .map(
+          (value) => DropdownMenuItem(
+            value: value,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(_humanLabel(value)),
             ),
-          )
-          .toList(),
-      onChanged: (value) {
-        if (value != null) onChanged(value);
-      },
-    );
-  }
+          ),
+        )
+        .toList(),
+    onChanged: _savingIncident
+        ? null
+        : (value) {
+            if (value != null) onChanged(value);
+          },
+  );
 
   Widget _buildIncidentList() {
     if (_incidents.isEmpty) {
@@ -305,9 +429,8 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
   Widget _buildIncidentRow(IncidentRecord incident) {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: AppPanel(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
+      child: _surface(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -385,23 +508,19 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
         final list = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const AppSectionHeader(
-              title: 'Recent incidents',
-              subtitle: 'Reports for the selected exam session.',
-            ),
+            AppSectionHeader(title: 'Recent incidents (${_incidents.length})'),
             const SizedBox(height: AppSpacing.lg),
-            _buildIncidentList(),
+            if (_loading)
+              const AppPageSkeleton(showMetrics: false)
+            else
+              _buildIncidentList(),
           ],
         );
 
         if (!wide) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              form,
-              const SizedBox(height: AppSpacing.xl),
-              list,
-            ],
+            children: [form, const SizedBox(height: 16), list],
           );
         }
 
@@ -435,12 +554,15 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const AppPageHeader(
-            title: 'Incident reporting',
-            subtitle:
-                'Log exam incidents against the exam selected on the dashboard.',
+          const Text(
+            'Incident reporting',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: 16),
           if (selected == null) ...[
             const AppEmptyState(
               title: 'No exam selected',
@@ -454,6 +576,35 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
               onPressed: () => context.go('/'),
             ),
           ] else ...[
+            _surface(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Reporting for',
+                    style: TextStyle(fontSize: 12, color: AppColors.muted),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    selected.courseCode,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(selected.venueName),
+                  const SizedBox(height: 4),
+                  Text(
+                    selected.timeRangeLabel,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             if (_error != null) ...[
               AppErrorBanner(
                 message: _error!,
@@ -461,10 +612,7 @@ class _IncidentsScreenState extends ConsumerState<IncidentsScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
             ],
-            if (_loading)
-              const AppPageSkeleton(showMetrics: false)
-            else
-              _buildWorkspace(),
+            _buildWorkspace(),
           ],
         ],
       ),
